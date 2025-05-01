@@ -1,0 +1,333 @@
+.root {
+    -fx-font-family: "Arial", sans-serif;
+}
+
+.root-pane {
+    -fx-background-color: #f8f8f8; /* Light background for light mode */
+}
+
+/* Camera panel styling */
+.camera-panel {
+    -fx-background-color: #ffffff; /* Light panel background */
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.2), 10, 0, 0, 5);
+    -fx-border-color: #c79b5f; /* Kept the same accent color */
+    -fx-border-width: 2px; /* Keep border prominent */
+}
+
+.camera-view-container {
+    -fx-background-color: #f0f0f0; /* Light gray background for camera view */
+    -fx-padding: 0px; /* Keep padding removed to maximize space */
+    -fx-min-height: 480px; /* Keep increased minimum height */
+}
+
+.camera-view {
+    -fx-fit-width: 100%;
+    -fx-fit-height: 100%;
+    -fx-preserve-ratio: true;
+}
+
+/* Options panel styling */
+.options-panel {
+    -fx-background-color: #ffffff;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.2), 10, 0, 0, 5);
+    -fx-border-color: #c79b5f;
+    -fx-border-width: 2px;
+    -fx-spacing: 5px;
+    -fx-padding: 5px;
+}
+
+.options-panel > VBox {
+    -fx-spacing: 10px;
+    -fx-fit-to-width: true;
+}
+
+.processed-image-container {
+    -fx-background-color: #f0f0f0;
+    -fx-min-height: 200px;
+    -fx-max-height: 300px; /* Increased max-height */
+    -fx-pref-height: 200px;
+    -fx-padding: 5px;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+}
+
+.processed-image {
+    -fx-fit-width: 100%;
+    -fx-fit-height: 100%;
+    -fx-preserve-ratio: true;
+    /* -fx-max-height: 190px; Removed this line */
+}
+
+/* Typography */
+.panel-title {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #c79b5f;
+    -fx-padding: 5px 0px;
+    -fx-alignment: center;
+}
+
+.section-header {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #c79b5f;
+    -fx-padding: 5px 0px;
+}
+
+/* Button styling */
+.main-button {
+    -fx-background-color: #d8a76a; /* Brighter accent color for better visibility */
+    -fx-text-fill: white;
+    -fx-font-size: 18px; /* Increased font size */
+    -fx-font-weight: bold;
+    -fx-padding: 14px 28px; /* Increased padding for larger buttons */
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.3), 6, 0, 0, 4); /* Enhanced shadow */
+    -fx-cursor: hand;
+}
+
+.main-button:hover {
+    -fx-background-color: #c79b5f; /* Original color on hover */
+    -fx-scale-x: 1.05; /* Slight scale effect on hover */
+    -fx-scale-y: 1.05;
+}
+
+.main-button:pressed {
+    -fx-background-color: #a2793c; /* Darker color when pressed */
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.4), 4, 0, 0, 3);
+    -fx-scale-x: 0.98; /* Slight scale down effect when pressed */
+    -fx-scale-y: 0.98;
+}
+
+.main-button:disabled {
+    -fx-background-color: #cccccc; /* Light gray for disabled state */
+    -fx-opacity: 0.6;
+}
+
+.secondary-button {
+    -fx-background-color: #e6e6e6; /* Light grey secondary button */
+    -fx-text-fill: #333333; /* Dark text for contrast */
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 10px 20px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-border-color: #c79b5f; /* Keep border with accent color */
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.2), 5, 0, 0, 3);
+    -fx-cursor: hand;
+}
+
+.secondary-button:hover {
+    -fx-background-color: #d9d9d9; /* Slightly darker grey on hover */
+}
+
+.secondary-button:pressed {
+    -fx-background-color: #c9c9c9; /* Even darker grey when pressed */
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.2), 3, 0, 0, 2);
+}
+
+.filter-button {
+    -fx-background-color: #f0f0f0;
+    -fx-text-fill: #333333;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 8px 10px;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-border-color: #c79b5f;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.2), 5, 0, 0, 3);
+    -fx-cursor: hand;
+    -fx-min-width: 120px;
+    -fx-max-width: 135px;
+}
+
+.filter-button:hover {
+    -fx-background-color: #c79b5f; /* Keep accent color on hover */
+    -fx-text-fill: white; /* White text on hover for contrast */
+}
+
+.filter-button:pressed {
+    -fx-background-color: #a2793c; /* Keep darker version when pressed */
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.3), 3, 0, 0, 2);
+}
+
+/* Layout elements */
+.button-bar {
+    -fx-background-color: #f5f5f5; /* Light background */
+    -fx-border-color: #c79b5f; /* Keep top border with accent color */
+    -fx-border-width: 2px 0 0 0;
+}
+
+.separator {
+    -fx-background-color: #c79b5f; /* Keep accent color */
+}
+
+.header-container {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #c79b5f;
+    -fx-border-width: 0 0 2px 0;
+    -fx-min-height: 50px;
+    -fx-pref-height: 50px;
+    -fx-alignment: center-left;
+}
+
+/* Media queries for responsiveness - keep these the same */
+@media screen and (max-width: 1024px) {
+    .panel-title {
+        -fx-font-size: 20px;
+    }
+
+    .section-header {
+        -fx-font-size: 16px;
+    }
+
+    .main-button {
+        -fx-font-size: 14px;
+        -fx-padding: 10px 20px;
+    }
+
+    .secondary-button {
+        -fx-font-size: 12px;
+        -fx-padding: 8px 15px;
+    }
+
+    .filter-button {
+        -fx-font-size: 12px;
+        -fx-padding: 6px 12px;
+    }
+}
+
+@media screen and (max-width: 800px) {
+    .panel-title {
+        -fx-font-size: 18px;
+    }
+
+    .main-button, .secondary-button, .filter-button {
+        -fx-max-width: 150px;
+    }
+}
+
+/* Round button base style */
+.round-button {
+    -fx-background-radius: 50%;
+    -fx-min-width: 70px; /* Increased size */
+    -fx-min-height: 70px; /* Increased size */
+    -fx-max-width: 70px; /* Increased size */
+    -fx-max-height: 70px; /* Increased size */
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.5), 6, 0, 0, 2); /* Enhanced shadow */
+    -fx-padding: 12px; /* Increased padding */
+    -fx-cursor: hand;
+}
+
+/* Main action buttons (like capture) */
+.main-button {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+/* Camera capture button specific styling */
+.camera-capture-button {
+    -fx-background-color: #e8b87a; /* Even brighter color for the main capture button */
+    -fx-min-width: 200px; /* Wider for text */
+    -fx-min-height: 60px;
+    -fx-border-width: 2px;
+    -fx-border-color: white;
+    -fx-font-size: 18px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.6), 8, 0, 0, 3);
+}
+
+/* Hover effect for buttons */
+.round-button:hover {
+    -fx-scale-x: 1.05;
+    -fx-scale-y: 1.05;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.6), 8, 0, 0, 2);
+}
+
+/* Pressed effect for buttons */
+.round-button:pressed {
+    -fx-scale-x: 0.95;
+    -fx-scale-y: 0.95;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.3), 3, 0, 0, 0);
+}
+
+/* Responsive layout - keep these the same */
+/* This will help components expand and contract as the window is resized */
+.camera-panel {
+    -fx-pref-width: 100%;
+}
+
+/* Ensure all HBox and VBox containers grow as needed */
+HBox, VBox {
+    -fx-fill-width: true;
+}
+
+/* Timer button styles */
+.timer-selection {
+    -fx-background-color: rgba(0, 0, 0, 0.5);
+    -fx-background-radius: 15px;
+    -fx-padding: 5px 10px;
+}
+
+.timer-button {
+    -fx-background-color: #c79b5f;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 8px 15px;
+    -fx-border-radius: 15px;
+    -fx-background-radius: 15px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.2), 5, 0, 0, 3);
+    -fx-cursor: hand;
+}
+
+.timer-button:hover {
+    -fx-background-color: #a2793c;
+}
+
+.timer-button:pressed {
+    -fx-background-color: #8a6730;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.3), 3, 0, 0, 2);
+}
+
+.timer-button-selected {
+    -fx-background-color: #8a6730;
+    -fx-border-color: white;
+    -fx-border-width: 2px;
+}
+
+/* Cancel button styling */
+.cancel-button {
+    -fx-background-color: #e74c3c; /* Red color for cancel */
+    -fx-text-fill: white;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-padding: 10px 20px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.3), 6, 0, 0, 4);
+    -fx-cursor: hand;
+}
+
+.cancel-button:hover {
+    -fx-background-color: #c0392b; /* Darker red on hover */
+    -fx-scale-x: 1.05;
+    -fx-scale-y: 1.05;
+}
+
+.cancel-button:pressed {
+    -fx-background-color: #a82315; /* Even darker red when pressed */
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.4), 4, 0, 0, 3);
+    -fx-scale-x: 0.98;
+    -fx-scale-y: 0.98;
+}
+
+/* Animation effects - keep these the same */
+.main-button, .secondary-button, .filter-button, .timer-button, .cancel-button {
+    -fx-transition: -fx-background-color 0.2s ease-in-out;
+}

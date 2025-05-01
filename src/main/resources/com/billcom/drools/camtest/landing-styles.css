@@ -1,0 +1,71 @@
+/* Video container styling */
+#restaurantVideoContainer {
+    -fx-background-color: black; /* Background color in case video doesn't load */
+}
+
+/* Make the MediaView fill the entire container */
+.media-view {
+    -fx-fit-width: 100%;
+    -fx-fit-height: 100%;
+}
+
+/* Content overlay styling */
+.content-overlay {
+    -fx-padding: 20px;
+    -fx-spacing: 30px;
+    -fx-alignment: center;
+}
+
+/* Button container styling */
+.button-container {
+    -fx-spacing: 20px;
+    -fx-alignment: center;
+    -fx-padding: 0 0 40px 0; /* Add more bottom padding to position buttons higher from the bottom */
+}
+
+/* Button styling */
+.main-button {
+    -fx-background-color: #c79b5f; /* Keep the specified accent color */
+    -fx-text-fill: white;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-padding: 12px 25px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.4), 8, 0, 0, 4); /* Enhanced shadow for better visibility on video */
+    -fx-cursor: hand;
+}
+
+.main-button:hover {
+    -fx-background-color: #a2793c; /* Keep gold/amber color on hover */
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 10, 0, 0, 5); /* Enhanced hover effect */
+}
+
+.main-button:pressed {
+    -fx-background-color: #a2793c; /* Keep darker color when pressed */
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 3, 0, 0, 2);
+}
+
+.main-button:disabled {
+    -fx-background-color: #cccccc; /* Light gray for disabled state */
+    -fx-opacity: 0.6;
+}
+
+.title-label {
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #000000; /* Keep the accent color */
+}
+
+.main-title-label {
+    -fx-font-size: 50px;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-effect: dropshadow(gaussian, black, 8, 0.7, 0, 3); /* Enhanced shadow for better visibility on video */
+}
+
+.subtitle-label {
+    -fx-font-size: 20px;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, black, 8, 0.7, 0, 3); /* Enhanced shadow for better visibility on video */
+}

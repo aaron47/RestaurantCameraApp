@@ -1,0 +1,77 @@
+/* Round button base style */
+.round-button {
+    -fx-background-radius: 50%;
+    -fx-min-width: 60px;
+    -fx-min-height: 60px;
+    -fx-max-width: 60px;
+    -fx-max-height: 60px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.4), 5, 0, 0, 1);
+    -fx-padding: 10px;
+    -fx-cursor: hand;
+}
+
+
+/* Button styling */
+.main-button {
+    -fx-background-color: #c79b5f; /* Keep the specified accent color */
+    -fx-text-fill: white;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-padding: 12px 25px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 5, 0, 0, 3);
+    -fx-cursor: hand;
+}
+
+.main-button:hover {
+    -fx-background-color: #a2793c; /* Keep gold/amber color on hover */
+}
+
+.main-button:pressed {
+    -fx-background-color: #a2793c; /* Keep darker color when pressed */
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 3, 0, 0, 2);
+}
+
+.main-button:disabled {
+    -fx-background-color: #cccccc; /* Light gray for disabled state */
+    -fx-opacity: 0.6;
+}
+
+/* Main action buttons (like capture) */
+.main-button {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+/* Camera capture button specific styling */
+.camera-capture-button {
+    -fx-min-width: 70px;
+    -fx-min-height: 70px;
+    -fx-max-width: 70px;
+    -fx-max-height: 70px;
+    -fx-border-radius: 50%;
+    -fx-border-width: 3px;
+    -fx-border-color: white;
+}
+
+/* Hover effect for buttons */
+.round-button:hover {
+    -fx-scale-x: 1.05;
+    -fx-scale-y: 1.05;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.6), 8, 0, 0, 2);
+}
+
+/* Pressed effect for buttons */
+.round-button:pressed {
+    -fx-scale-x: 0.95;
+    -fx-scale-y: 0.95;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 3, 0, 0, 0);
+}
+
+.main-button, .secondary-button, .filter-button {
+    -fx-transition: -fx-background-color 0.2s ease-in-out;
+}
+.scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}

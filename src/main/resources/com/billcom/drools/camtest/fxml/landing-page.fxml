@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.media.MediaView?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<!-- Use StackPane as the root container to allow full-screen video with floating elements -->
+<StackPane fx:id="restaurantVideoContainer"
+      stylesheets="@../landing-styles.css"
+      xmlns="http://javafx.com/javafx/17.0.12"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.billcom.drools.camtest.controller.LandingPageController">
+
+    <!-- Video as the background -->
+    <MediaView fx:id="restaurantVideoView" />
+
+    <!-- Content overlay -->
+    <VBox alignment="CENTER" spacing="20.0" styleClass="content-overlay">
+        <!-- Welcome text -->
+        <VBox alignment="CENTER" VBox.vgrow="ALWAYS">
+            <Label text="WELCOME TO LE MÉDITERRANÉE" styleClass="subtitle-label" />
+            <Label text="Restaurant le Méditerranée" styleClass="main-title-label" />
+            <Label text="Port El Kantaoui Sousse" styleClass="subtitle-label" />
+        </VBox>
+
+        <!-- Buttons at the bottom -->
+        <HBox spacing="20" alignment="CENTER" styleClass="button-container">
+            <padding>
+                <Insets top="20" right="20" bottom="30" left="20"/>
+            </padding>
+
+            <Button styleClass="main-button" fx:id="galleryBtn"
+                    onAction="#navigateToGalleryView"
+                    minWidth="150" maxWidth="220" prefWidth="200" prefHeight="50">
+                <graphic>
+                    <FontIcon iconLiteral="fas-images" iconSize="20" fill="WHITE"/>
+                </graphic>
+                <text>Gallery</text>
+            </Button>
+
+            <Button styleClass="main-button" fx:id="cameraViewBtn"
+                    onAction="#navigateToCameraView"
+                    minWidth="150" maxWidth="220" prefWidth="200" prefHeight="50">
+                <graphic>
+                    <FontIcon iconLiteral="fas-camera" iconSize="20" fill="WHITE"/>
+                </graphic>
+                <text>Camera View</text>
+            </Button>
+        </HBox>
+    </VBox>
+</StackPane>
