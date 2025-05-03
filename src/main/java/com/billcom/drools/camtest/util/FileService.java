@@ -14,6 +14,19 @@ public class FileService {
     }
 
     /**
+     * Gets or creates the photo directory.
+     *
+     * @return the photo directory
+     */
+    public static File getOrCreatePhotoDirectory() {
+        File photoDir = new File(Constants.IMAGE_FOLDER);
+        if (!photoDir.exists()) {
+            photoDir.mkdirs();
+        }
+        return photoDir;
+    }
+
+    /**
      * Get the size of the image directory in gigabytes.
      *
      * @return the size of the directory in gigabytes

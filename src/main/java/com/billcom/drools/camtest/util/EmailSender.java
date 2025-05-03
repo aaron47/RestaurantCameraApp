@@ -191,6 +191,36 @@ public class EmailSender {
         alert.showAndWait();
     }
 
+    // Send email with attachment using byte array
+    public static void sendEmailWithAttachment(String recipient, String subject, String body, String attachmentName, byte[] attachmentData) {
+        // Start sending email in background
+        CompletableFuture.runAsync(() -> {
+            try {
+                // Create a temporary file for the attachment
+                File tempFile = File.createTempFile("email_attachment_", attachmentName);
+                tempFile.deleteOnExit();
+
+                // Write the attachment data to the file
+                java.nio.file.Files.write(tempFile.toPath(), attachmentData);
+
+                // Send the email
+                boolean success = sendEmail(recipient, tempFile);
+
+                if (success) {
+                    System.out.println("Email sent successfully to " + recipient);
+                } else {
+                    System.err.println("Failed to send email to " + recipient);
+                }
+
+                // Delete the temporary file
+                tempFile.delete();
+            } catch (Exception e) {
+                System.err.println("Error sending email: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }, emailExecutor);
+    }
+
     // Send email with attachment
     private static boolean sendEmail(String recipient, File attachment) {
         // NOTE: For a production app, you would use proper credential management

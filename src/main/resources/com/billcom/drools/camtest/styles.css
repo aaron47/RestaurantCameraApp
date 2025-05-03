@@ -269,8 +269,8 @@ HBox, VBox {
 
 /* Timer button styles */
 .timer-selection {
-    -fx-background-color: rgba(0, 0, 0, 0.5);
-    -fx-background-radius: 15px;
+    /*-fx-background-color: rgba(0, 0, 0, 0.5);*/
+    /*-fx-background-radius: 15px;*/
     -fx-padding: 5px 10px;
 }
 

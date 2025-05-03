@@ -13,6 +13,9 @@ module com.billcom.drools.camtest {
     requires com.google.zxing;
     requires com.google.zxing.javase;
     requires javafx.media;
+    requires org.kordamp.ikonli.javafx;
+    requires org.kordamp.ikonli.core;
+    requires slf4j.api;
 
 
     opens com.billcom.drools.camtest to javafx.fxml;

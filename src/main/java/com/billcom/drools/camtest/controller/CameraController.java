@@ -7,11 +7,16 @@ import com.billcom.drools.camtest.util.EmailSender;
 import com.billcom.drools.camtest.dialog.QRCodeDialog;
 import com.billcom.drools.camtest.drive.GoogleDriveService;
 import com.billcom.drools.camtest.util.FileService;
+import java.awt.Dimension;
+import java.util.Arrays;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -22,6 +27,9 @@ import javafx.scene.image.PixelWriter;
 import javafx.scene.image.PixelReader;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import org.kordamp.ikonli.javafx.FontIcon;
 import javafx.scene.text.Font;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -34,18 +42,20 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import javafx.util.Duration;
-import org.opencv.core.*;
-import org.opencv.imgproc.Imgproc;
-import org.opencv.objdetect.CascadeClassifier;
-import org.opencv.videoio.VideoCapture;
+import com.github.sarxos.webcam.Webcam;
+import com.github.sarxos.webcam.WebcamResolution;
 
 public class CameraController implements Shutdown {
+    // Logger for this class
+    private static final Logger logger = LoggerFactory.getLogger(CameraController.class);
+
     // fxml binded attributes
     @FXML
     private ImageView cameraView;
@@ -72,9 +82,8 @@ public class CameraController implements Shutdown {
     @FXML
     private Button cancelTimerBtn;
 
-    // OpenCV attributes
-    private VideoCapture capture;
-    private CascadeClassifier faceDetector;
+    // Camera attributes
+    private Webcam webcam;
     private boolean cameraActive = false;
 
     // Executors for camera and QR code generation
@@ -97,17 +106,12 @@ public class CameraController implements Shutdown {
     // Store the raw camera frame without borders
     private WritableImage rawCameraFrame = null;
 
-    // face detection intervals
-    private static final int FACE_DETECTION_INTERVAL = 10;
-    private int frameCounter = 0;
-
     private final NavigationService navigationService = new NavigationService();
 
     // Methods for initialising necessary functionality for the application
     @FXML
     public void initialize() {
         this.startCamera();
-        this.loadFaceDetectionModel();
         cameraView.fitWidthProperty().bind(cameraPanel.widthProperty());
         cameraView.fitHeightProperty().bind(cameraPanel.heightProperty());
         this.setupCountdownTimer();
@@ -129,9 +133,9 @@ public class CameraController implements Shutdown {
             borders.put("christmas2", new Image(RestaurantApplication.class.getResourceAsStream("borders/christmas2.png")));
             borders.put("christmas3", new Image(RestaurantApplication.class.getResourceAsStream("borders/christmas3.png")));
             borders.put("valentines", new Image(RestaurantApplication.class.getResourceAsStream("borders/valentines.png")));
+            logger.info("Border images loaded successfully");
         } catch (Exception e) {
-            System.err.println("Error loading border images: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error loading border images: {}", e.getMessage(), e);
         }
     }
 
@@ -150,6 +154,61 @@ public class CameraController implements Shutdown {
         updateCountdownTimeline();
     }
 
+    /**
+     * Displays an error message in the camera view when the camera fails to initialize
+     * This helps maintain the UI layout even when the camera doesn't work
+     */
+    private void displayCameraErrorMessage(String errorMessage) {
+        javafx.application.Platform.runLater(() -> {
+            try {
+                // Create a VBox to hold the error message
+                VBox errorBox = new VBox();
+                errorBox.setAlignment(Pos.CENTER);
+                errorBox.setStyle("-fx-background-color: #333333; -fx-padding: 20px;");
+                errorBox.setPrefSize(640, 480); // Set preferred size to maintain layout
+
+                // Create a label with the error message
+                Label errorLabel = new Label(errorMessage);
+                errorLabel.setStyle("-fx-text-fill: white; -fx-font-size: 16px;");
+                errorLabel.setWrapText(true);
+
+                // Add a generic camera icon
+                FontIcon cameraIcon = new FontIcon("fas-camera-retro");
+                cameraIcon.setIconSize(48);
+                cameraIcon.setIconColor(Color.RED);
+
+                // Add components to the VBox
+                errorBox.getChildren().addAll(cameraIcon, errorLabel);
+                errorBox.setSpacing(15);
+
+                // Create a scene to hold the error box (needed for snapshot)
+                javafx.scene.Scene tempScene = new javafx.scene.Scene(errorBox);
+
+                // Create a snapshot of the error box
+                WritableImage errorImage = errorBox.snapshot(new javafx.scene.SnapshotParameters(), null);
+
+                // Set the error image to the camera view
+                cameraView.setImage(errorImage);
+
+                // Disable capture button
+                captureBtn.setDisable(true);
+            } catch (Exception e) {
+                logger.error("Error displaying camera error message: {}", e.getMessage(), e);
+
+                // Fallback to a simple colored rectangle if the fancy error display fails
+                WritableImage fallbackImage = new WritableImage(640, 480);
+                PixelWriter pw = fallbackImage.getPixelWriter();
+                for (int y = 0; y < 480; y++) {
+                    for (int x = 0; x < 640; x++) {
+                        pw.setColor(x, y, Color.DARKGRAY);
+                    }
+                }
+                cameraView.setImage(fallbackImage);
+                captureBtn.setDisable(true);
+            }
+        });
+    }
+
     private void updateCountdownTimeline() {
         // Create countdown timeline
         if (countDownTimeline != null) {
@@ -157,48 +216,33 @@ public class CameraController implements Shutdown {
         }
 
         countDownTimeline = new Timeline();
-        countDownTimeline.setCycleCount(1);
+        countDownTimeline.setCycleCount(timerDuration);
 
-        // Create key frames for countdown
-        countDownTimeline.getKeyFrames().clear();
+        KeyFrame keyFrame = new KeyFrame(Duration.seconds(1), event -> {
+            int remainingSeconds = Integer.parseInt(countDownLabel.getText()) - 1;
+            countDownLabel.setText(String.valueOf(remainingSeconds));
 
-        // Add frames for each second of the countdown
-        for (int i = 0; i < timerDuration; i++) {
-            final int secondsLeft = timerDuration - i;
-            KeyFrame frame = new KeyFrame(
-                Duration.seconds(i), 
-                event -> countDownLabel.setText(String.valueOf(secondsLeft))
-            );
-            countDownTimeline.getKeyFrames().add(frame);
-        }
-
-        // Add "SMILE!" frame
-        KeyFrame smileFrame = new KeyFrame(
-            Duration.seconds(timerDuration), 
-            event -> countDownLabel.setText("SMILE!")
-        );
-
-        // Add the final frame to actually take the picture (0.5 seconds after "SMILE!")
-        KeyFrame captureFrame = new KeyFrame(
-            Duration.seconds(timerDuration + 0.5), 
-            event -> {
+            if (remainingSeconds <= 0) {
+                countDownTimeline.stop();
                 countDownLabel.setVisible(false);
                 countDownActive = false;
-                cancelTimerBtn.setVisible(false); // Ensure cancel button is hidden
-                this.capturePhoto();
-                captureBtn.setDisable(false);
+                capturePhoto();
+                cancelTimerBtn.setVisible(false);
             }
-        );
+        });
 
-        countDownTimeline.getKeyFrames().addAll(smileFrame, captureFrame);
+        countDownTimeline.getKeyFrames().add(keyFrame);
+        countDownTimeline.setOnFinished(event -> {
+            countDownLabel.setText(String.valueOf(timerDuration));
+        });
     }
 
-    // Methods to set timer duration
     @FXML
     private void setTimer2Seconds() {
         timerDuration = 2;
         updateCountdownTimeline();
         updateTimerButtonStyles(timer2Button);
+        logger.info("Timer set to 2 seconds");
     }
 
     @FXML
@@ -229,149 +273,125 @@ public class CameraController implements Shutdown {
 
     private void startCamera() {
         if (!cameraActive) {
-            // Try to open the camera
-            capture = new VideoCapture();
-            capture.open(cameraIndex);
+            try {
+                // Try to open the camera with specified index
+                List<Webcam> webcams = Webcam.getWebcams();
+                if (webcams.isEmpty()) {
+                    logger.error("No webcams found");
+                    return;
+                }
 
-            if (capture.isOpened()) {
-                cameraActive = true;
+                // Try to get the camera with the specified index, or default to the first one
+                if (cameraIndex < webcams.size()) {
+                    webcam = webcams.get(cameraIndex);
+                } else {
+                    webcam = webcams.get(0);
+                    cameraIndex = 0;
+                }
 
-                // Start the camera capture thread
-                cameraTimer = Executors.newSingleThreadScheduledExecutor();
-                cameraTimer.scheduleAtFixedRate(this::updateFrame, 0, 100, TimeUnit.MILLISECONDS);
-                System.out.println("Camera started successfully");
-            } else {
-                System.err.println("Failed to open camera with index: " + cameraIndex);
-                // Try default camera as fallback
-                capture.open(0);
-                if (capture.isOpened()) {
+                // Try to set resolution to VGA (640x480) which is more widely supported
+                try {
+                    webcam.setViewSize(WebcamResolution.VGA.getSize());
+                } catch (IllegalArgumentException e) {
+                    // If VGA is not supported, try to use a supported resolution
+                    Dimension[] supportedSizes = webcam.getViewSizes();
+                    if (supportedSizes.length > 0) {
+                        // Use the first available resolution (usually the smallest)
+                        webcam.setViewSize(supportedSizes[0]);
+                        logger.info("Using camera resolution: {}x{}", supportedSizes[0].width, supportedSizes[0].height);
+                    } else {
+                        logger.error("No supported resolutions found for camera");
+                        return;
+                    }
+                }
+
+                // Open the webcam
+                webcam.open();
+
+                if (webcam.isOpen()) {
                     cameraActive = true;
+
+                    // Start the camera capture thread
                     cameraTimer = Executors.newSingleThreadScheduledExecutor();
                     cameraTimer.scheduleAtFixedRate(this::updateFrame, 0, 33, TimeUnit.MILLISECONDS);
-                    System.out.println("Default camera started as fallback");
+                    logger.info("Camera started successfully");
                 } else {
-                    System.err.println("Could not start any camera");
+                    logger.error("Failed to open camera with index: {}", cameraIndex);
+                    displayCameraErrorMessage("Failed to open camera");
                 }
+            } catch (Exception e) {
+                logger.error("Error starting camera: {}", e.getMessage(), e);
+                displayCameraErrorMessage("Camera error: " + e.getMessage());
             }
-        }
-    }
-
-    private void loadFaceDetectionModel() {
-        try {
-            // Try to find the cascade file in several locations
-            File cascadeFile = new File("haarcascade_frontalface_alt.xml");
-            if (!cascadeFile.exists()) {
-                cascadeFile = new File("src/main/resources/haarcascade_frontalface_alt.xml");
-            }
-
-            if (cascadeFile.exists()) {
-                faceDetector = new CascadeClassifier(cascadeFile.getAbsolutePath());
-                if (faceDetector.empty()) {
-                    System.err.println("Failed to load face detection model");
-                    faceDetector = null;
-                } else {
-                    System.out.println("Face detection model loaded successfully");
-                }
-            } else {
-                System.err.println("Cascade file not found");
-                faceDetector = null;
-            }
-        } catch (Exception e) {
-            System.err.println("Error loading face detection model: " + e.getMessage());
-            e.printStackTrace();
-            faceDetector = null;
         }
     }
 
     private void updateFrame() {
-        Mat frame = new Mat();
+        if (webcam != null && webcam.isOpen()) {
+            try {
+                // Get image from webcam
+                BufferedImage bufferedImage = webcam.getImage();
 
-        // Try to read a new frame
-        boolean frameRead = capture.read(frame);
+                if (bufferedImage != null) {
+                    // Convert BufferedImage to JavaFX WritableImage
+                    WritableImage writableImage = convertToFxImage(bufferedImage);
 
-        if (frameRead && !frame.empty()) {
-            // Convert the frame from BGR to RGB
-            Imgproc.cvtColor(frame, frame, Imgproc.COLOR_BGR2RGB);
+                    // Store the raw camera frame without borders
+                    rawCameraFrame = writableImage;
 
-            // Detect faces if the face detector is available
-            if (faceDetector != null && !faceDetector.empty() && (frameCounter % FACE_DETECTION_INTERVAL == 0)) {
-                detectFaces(frame);
-            }
-            this.frameCounter++;
+                    // Update the ImageView on the JavaFX Application Thread
+                    javafx.application.Platform.runLater(() -> {
+                        // Always start with the raw frame
+                        cameraView.setImage(writableImage);
 
-            // Convert the OpenCV Mat to a JavaFX WritableImage
-            WritableImage writableImage = convertToFxImage(frame);
+                        // Apply border for preview if needed
+                        if (currentBorder != null && borders.containsKey(currentBorder)) {
+                            StackPane previewPane = new StackPane();
+                            // Set alignment to center for proper border positioning
+                            previewPane.setAlignment(Pos.CENTER);
 
-            // Store the raw camera frame without borders
-            rawCameraFrame = writableImage;
+                            ImageView imageView = new ImageView(writableImage);
+                            ImageView borderView = new ImageView(borders.get(currentBorder));
 
-            // Update the ImageView on the JavaFX Application Thread
-            javafx.application.Platform.runLater(() -> {
-                // Always start with the raw frame
-                cameraView.setImage(writableImage);
+                            // Ensure border is sized correctly to match the image
+                            borderView.setFitWidth(writableImage.getWidth());
+                            borderView.setFitHeight(writableImage.getHeight());
+                            borderView.setPreserveRatio(false);
 
-                // Apply border for preview if needed
-                if (currentBorder != null && borders.containsKey(currentBorder)) {
-                    StackPane previewPane = new StackPane();
-                    previewPane.getChildren().addAll(
-                            new ImageView(writableImage),
-                            new ImageView(borders.get(currentBorder))
-                    );
+                            previewPane.getChildren().addAll(imageView, borderView);
 
-                    WritableImage previewImage = new WritableImage(
-                            (int) writableImage.getWidth(), (int) writableImage.getHeight());
+                            WritableImage previewImage = new WritableImage(
+                                    (int) writableImage.getWidth(), (int) writableImage.getHeight());
 
-                    previewPane.snapshot(null, previewImage);
-                    cameraView.setImage(previewImage);
+                            previewPane.snapshot(null, previewImage);
+                            cameraView.setImage(previewImage);
+                        }
+                    });
                 }
-            });
+            } catch (Exception e) {
+                logger.error("Error updating frame: {}", e.getMessage(), e);
+            }
         }
     }
 
-    private void detectFaces(Mat frame) {
-        Mat grayFrame = new Mat();
-        Imgproc.cvtColor(frame, grayFrame, Imgproc.COLOR_RGB2GRAY);
-        Imgproc.equalizeHist(grayFrame, grayFrame);
-
-        MatOfRect faceDetections = new MatOfRect();
-        faceDetector.detectMultiScale(
-                grayFrame,
-                faceDetections,
-                1.1,
-                2,
-                0 | org.opencv.objdetect.Objdetect.CASCADE_SCALE_IMAGE,
-                new Size(30, 30)
-        );
-
-        Rect[] facesArray = faceDetections.toArray();
-        for (Rect face : facesArray) {
-//            Imgproc.rectangle(
-//                    frame,
-//                    new Point(face.x, face.y),
-//                    new Point(face.x + face.width, face.y + face.height),
-//                    new Scalar(0, 255, 0),
-//                    3
-//            );
-        }
-    }
-
-
-    // All the button event methods
     @FXML
     private void onCapture() {
-        if (cameraView.getImage() != null && !countDownActive) {
-            // Start the countdown
-            countDownActive = true;
-            captureBtn.setDisable(true);
+        if (cameraActive) {
+            if (countDownActive) {
+                // If countdown is already active, do nothing
+                return;
+            }
+
+            // Start countdown
             countDownLabel.setText(String.valueOf(timerDuration));
             countDownLabel.setVisible(true);
-
-            // Show cancel button and ensure it's in front
-            cancelTimerBtn.setVisible(true);
-            cancelTimerBtn.toFront();
-
+            countDownActive = true;
             countDownTimeline.playFromStart();
-            System.out.println("Countdown started");
+
+            // Show cancel button
+            cancelTimerBtn.setVisible(true);
+        } else {
+            logger.error("Camera is not active");
         }
     }
 
@@ -380,224 +400,230 @@ public class CameraController implements Shutdown {
         if (countDownActive) {
             // Stop the countdown
             countDownTimeline.stop();
-            countDownActive = false;
             countDownLabel.setVisible(false);
+            countDownActive = false;
 
             // Hide cancel button
             cancelTimerBtn.setVisible(false);
 
-            captureBtn.setDisable(false);
-            System.out.println("Countdown cancelled");
+            // Reset the countdown label
+            countDownLabel.setText(String.valueOf(timerDuration));
         }
     }
 
-    // Split the original onCapture method into two parts:
-    // 1. The onCapture method that starts the countdown
-    // 2. The capturePhoto method that will be called when the countdown finishes
     private void capturePhoto() {
-        if (rawCameraFrame != null) {
-            // Hide cancel button
-            cancelTimerBtn.setVisible(false);
+        if (cameraActive && rawCameraFrame != null) {
+            try {
+                // Create a copy of the current frame
+                WritableImage capturedImage = new WritableImage(
+                        (int) rawCameraFrame.getWidth(),
+                        (int) rawCameraFrame.getHeight());
 
-            // Always use the raw camera frame without borders as our base
-            Image snapshot = rawCameraFrame;
-            Image originalLogo = new Image(RestaurantApplication.class.getResourceAsStream("restaurant_logo.png")); // Load the logo image
+                // Copy pixels from the raw frame
+                PixelReader pixelReader = rawCameraFrame.getPixelReader();
+                PixelWriter pixelWriter = capturedImage.getPixelWriter();
 
-            // Create a canvas to draw both images
-            javafx.scene.canvas.Canvas canvas = new javafx.scene.canvas.Canvas(
-                    snapshot.getWidth(), snapshot.getHeight());
-            javafx.scene.canvas.GraphicsContext gc = canvas.getGraphicsContext2D();
-
-            // Draw the original image
-            gc.drawImage(snapshot, 0, 0);
-
-            // Apply border if one is selected
-            if (currentBorder != null && borders.containsKey(currentBorder)) {
-                Image border = borders.get(currentBorder);
-                gc.drawImage(border, 0, 0, snapshot.getWidth(), snapshot.getHeight());
-            }
-
-            // Scale the logo to a smaller size (adjust these values as needed)
-            double logoWidth = snapshot.getWidth() * 0.15; // 15% of the image width
-            double logoHeight = originalLogo.getHeight() * (logoWidth / originalLogo.getWidth()); // Keep aspect ratio
-            // Calculate position for the resized logo in bottom right
-            double logoX = snapshot.getWidth() - logoWidth - 10; // 10px padding
-            double logoY = snapshot.getHeight() - logoHeight - 10; // 10px padding
-
-            // Draw the resized logo at the bottom right
-            gc.drawImage(originalLogo, logoX, logoY, logoWidth, logoHeight);
-
-            // Capture the final image
-            WritableImage finalImage = new WritableImage(
-                    (int) snapshot.getWidth(), (int) snapshot.getHeight());
-            canvas.snapshot(null, finalImage);
-
-            // Resize the finalImage to fit within the processedImageView area
-            int originalWidth = (int) finalImage.getWidth();
-            int originalHeight = (int) finalImage.getHeight();
-
-            double maxWidth = 350; // Example maximum width for processedImageView (adjust as needed)
-            double maxHeight = 350; // Example maximum height for processedImageView (adjust as needed)
-
-            double widthScale = maxWidth / originalWidth;
-            double heightScale = maxHeight / originalHeight;
-
-            double scale = Math.min(widthScale, heightScale);
-
-            int scaledWidth = (int) (originalWidth * scale);
-            int scaledHeight = (int) (originalHeight * scale);
-
-            WritableImage scaledImage = new WritableImage(scaledWidth, scaledHeight);
-            PixelWriter writer = scaledImage.getPixelWriter();
-            PixelReader reader = finalImage.getPixelReader();
-
-            for (int y = 0; y < scaledHeight; y++) {
-                for (int x = 0; x < scaledWidth; x++) {
-                    writer.setColor(x, y, reader.getColor((int) (x / scale), (int) (y / scale)));
+                for (int y = 0; y < rawCameraFrame.getHeight(); y++) {
+                    for (int x = 0; x < rawCameraFrame.getWidth(); x++) {
+                        pixelWriter.setArgb(x, y, pixelReader.getArgb(x, y));
+                    }
                 }
-            }
 
-            processedImageView.setImage(scaledImage);
-            saveBtn.setDisable(false);
-            qrCodeBtn.setDisable(false);
-            emailBtn.setDisable(false); // Enable email button after capturing photo
-            System.out.println("Image captured and resized with logo");
+                // Apply border if selected
+                if (currentBorder != null && borders.containsKey(currentBorder)) {
+                    StackPane capturePane = new StackPane();
+                    // Set alignment to center for proper border positioning
+                    capturePane.setAlignment(Pos.CENTER);
+
+                    ImageView imageView = new ImageView(capturedImage);
+                    ImageView borderView = new ImageView(borders.get(currentBorder));
+
+                    // Ensure border is sized correctly to match the image
+                    borderView.setFitWidth(capturedImage.getWidth());
+                    borderView.setFitHeight(capturedImage.getHeight());
+                    borderView.setPreserveRatio(false);
+
+                    capturePane.getChildren().addAll(imageView, borderView);
+
+                    WritableImage borderedImage = new WritableImage(
+                            (int) capturedImage.getWidth(), (int) capturedImage.getHeight());
+
+                    capturePane.snapshot(null, borderedImage);
+                    capturedImage = borderedImage;
+                }
+
+                // Resize the image to fit within the processed image container (max 330x350)
+                // while preserving aspect ratio
+                double maxWidth = 330.0;
+                double maxHeight = 350.0;
+                double imgWidth = capturedImage.getWidth();
+                double imgHeight = capturedImage.getHeight();
+                double scale = Math.min(maxWidth / imgWidth, maxHeight / imgHeight);
+
+                // Only scale down, not up
+                if (scale < 1.0) {
+                    int newWidth = (int) (imgWidth * scale);
+                    int newHeight = (int) (imgHeight * scale);
+
+                    // Create a new scaled image
+                    WritableImage scaledImage = new WritableImage(newWidth, newHeight);
+                    PixelWriter scaledWriter = scaledImage.getPixelWriter();
+
+                    // Simple scaling algorithm - could be improved for better quality
+                    // Get pixel reader from the bordered image
+                    PixelReader borderedPixelReader = capturedImage.getPixelReader();
+                    for (int y = 0; y < newHeight; y++) {
+                        for (int x = 0; x < newWidth; x++) {
+                            int srcX = (int) (x / scale);
+                            int srcY = (int) (y / scale);
+                            scaledWriter.setArgb(x, y, borderedPixelReader.getArgb(srcX, srcY));
+                        }
+                    }
+
+                    capturedImage = scaledImage;
+                    logger.info("Resized image to {}x{}", newWidth, newHeight);
+                }
+
+                // Display the captured image
+                processedImageView.setImage(capturedImage);
+
+                // Enable save and email buttons
+                saveBtn.setDisable(false);
+                emailBtn.setDisable(false);
+                qrCodeBtn.setDisable(false);
+
+                logger.info("Photo captured successfully");
+            } catch (Exception e) {
+                logger.error("Error capturing photo: {}", e.getMessage(), e);
+            }
+        } else {
+            logger.error("Cannot capture photo: Camera not active or no frame available");
         }
     }
 
-    /**
-     * Shows a user agreement dialog and returns true if the user accepts
-     */
     private boolean showUserAgreementDialog() {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("User Agreement");
-        alert.setHeaderText("Please read and accept the user agreement");
-        alert.setContentText("By saving this image, you agree that:\n\n" +
-                "1. You have the right to take and save this photo\n" +
-                "2. You grant Restaurant le Méditerranée permission to store this image\n" +
-                "3. You understand that this image may be displayed in the restaurant's gallery\n" +
-                "4. You consent to the restaurant using this image for promotional purposes\n\n" +
+        alert.setHeaderText("Terms of Use");
+        alert.setContentText("By saving this photo, you agree that:\n\n" +
+                "1. The photo may be displayed in the restaurant and on social media.\n" +
+                "2. You have permission from all individuals in the photo to share it.\n\n" +
                 "Do you agree to these terms?");
 
-        Stage currentStage = (Stage) processedImageView.getScene().getWindow();
-        alert.initOwner(currentStage);
+        // Set modality to APPLICATION_MODAL to block input to other windows
         alert.initModality(Modality.APPLICATION_MODAL);
 
-        // Use ButtonType.OK and ButtonType.CANCEL for the buttons
-        return alert.showAndWait().filter(response -> response == javafx.scene.control.ButtonType.OK).isPresent();
+        // Get the stage and set its owner to the main application window
+        Stage stage = (Stage) alert.getDialogPane().getScene().getWindow();
+        stage.setAlwaysOnTop(true);
+
+        // Show the dialog and wait for a response
+        return alert.showAndWait()
+                .filter(response -> response == javafx.scene.control.ButtonType.OK)
+                .isPresent();
     }
 
     @FXML
     private void onSave() {
-        // Show user agreement dialog first
-        if (!showUserAgreementDialog()) {
-            // User declined the agreement
-            System.out.println("User declined the agreement, image not saved");
+        if (processedImageView.getImage() == null) {
+            logger.error("No image to save");
             return;
         }
 
-        Double imageDirectorySize = FileService.getImageDirectorySize();
-
-        if (imageDirectorySize >= Constants.MAX_IMAGE_FOLDER_SIZE) {
-            FileService.clearOldFiles(1.0); // Clear 1 GB of old files
+        // Show user agreement dialog
+        if (!showUserAgreementDialog()) {
+            logger.info("User declined the agreement");
+            return;
         }
 
-        if (processedImageView.getImage() != null) {
-            String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-            String imageFileName = "photo_" + timestamp + ".png";
+        try {
+            // Create a unique filename based on current date and time
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
+            String timestamp = dateFormat.format(new Date());
+            String fileName = "photo_" + timestamp + ".png";
 
-            // Create the directory if it doesn't exist
-            File imageFolder = new File(Constants.IMAGE_FOLDER);
-            if (!imageFolder.exists()) {
-                boolean dirCreated = imageFolder.mkdirs();
-                if (!dirCreated) {
-                    System.err.println("Failed to create directory: " + Constants.IMAGE_FOLDER);
+            // Get the directory to save the image
+            File saveDir = FileService.getOrCreatePhotoDirectory();
+            lastSavedImageFile = new File(saveDir, fileName);
 
-                    Alert alert = new Alert(Alert.AlertType.ERROR);
-                    alert.setTitle("Save Error");
-                    alert.setHeaderText("Failed to create directory");
-                    alert.setContentText("Could not create directory: " + Constants.IMAGE_FOLDER);
-                    alert.showAndWait();
-                    return;
-                }
-                System.out.println("Created directory: " + Constants.IMAGE_FOLDER);
-            }
+            // Convert the JavaFX image to a BufferedImage
+            BufferedImage bufferedImage = convertFromFxImage(processedImageView.getImage());
 
-            lastSavedImageFile = new File(Constants.IMAGE_FOLDER, imageFileName);
+            // Save the image
+            ImageIO.write(bufferedImage, "png", lastSavedImageFile);
 
-            try {
-                BufferedImage bufferedImage = convertFromFxImage((Image) processedImageView.getImage());
-                ImageIO.write(bufferedImage, "png", lastSavedImageFile);
+            logger.info("Image saved to: {}", lastSavedImageFile.getAbsolutePath());
 
-                Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                alert.setTitle("Saved Image");
-                alert.setHeaderText("Image saved successfully");
-                alert.setContentText("Image saved successfully");
+            // Show success alert
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Success");
+            alert.setHeaderText("Photo Saved");
+            alert.setContentText("Your photo has been saved successfully!");
+            alert.showAndWait();
 
-                Stage currentStage = (Stage) processedImageView.getScene().getWindow();
-                alert.initOwner(currentStage);
-                alert.initModality(Modality.APPLICATION_MODAL);
+        } catch (IOException e) {
+            logger.error("Error saving image: {}", e.getMessage(), e);
 
-                alert.showAndWait();
-
-                System.out.println("Image saved: " + lastSavedImageFile.getAbsolutePath());
-            } catch (IOException e) {
-                System.err.println("Error saving image: " + e.getMessage());
-                e.printStackTrace();
-
-                Alert alert = new Alert(Alert.AlertType.ERROR);
-                alert.setTitle("Save Error");
-                alert.setHeaderText("Failed to save image");
-                alert.setContentText("Error: " + e.getMessage());
-                alert.showAndWait();
-            }
+            // Show error alert
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Save Failed");
+            alert.setContentText("Failed to save the photo: " + e.getMessage());
+            alert.showAndWait();
         }
     }
 
     @FXML
     private void onEmailPhoto() {
-        Stage stage = (Stage) cameraView.getScene().getWindow();
-
-        // If we have a saved file, use it
-        if (lastSavedImageFile != null && lastSavedImageFile.exists()) {
-            EmailSender.showEmailDialog(stage, lastSavedImageFile);
+        if (processedImageView.getImage() == null) {
+            logger.error("No image to email");
             return;
         }
 
-        // If no saved file but we have a processed image, create a temporary file
-        if (processedImageView.getImage() != null) {
-            try {
-                // Create a temporary file for the email attachment
-                File tempDir = new File(System.getProperty("java.io.tmpdir"));
-                String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-                File tempFile = new File(tempDir, "photo_" + timestamp + ".png");
+        // Show user agreement dialog
+        if (!showUserAgreementDialog()) {
+            logger.info("User declined the agreement");
+            return;
+        }
 
-                // Convert the processed image to a BufferedImage and save it to the temp file
-                BufferedImage bufferedImage = convertFromFxImage(processedImageView.getImage());
-                ImageIO.write(bufferedImage, "png", tempFile);
+        try {
+            // Convert the JavaFX image to a BufferedImage
+            BufferedImage bufferedImage = convertFromFxImage(processedImageView.getImage());
 
-                // Delete the temp file when the JVM exits
-                tempFile.deleteOnExit();
+            // Convert BufferedImage to byte array
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(bufferedImage, "png", baos);
+            byte[] imageBytes = baos.toByteArray();
 
-                // Show the email dialog with the temp file
-                EmailSender.showEmailDialog(stage, tempFile);
+            // Create a unique filename based on current date and time
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
+            String timestamp = dateFormat.format(new Date());
+            String fileName = "photo_" + timestamp + ".png";
 
-                System.out.println("Using temporary file for email: " + tempFile.getAbsolutePath());
-            } catch (IOException e) {
-                System.err.println("Error creating temporary file for email: " + e.getMessage());
-                e.printStackTrace();
+            // Send the email with the image attachment
+            EmailSender.sendEmailWithAttachment(
+                    Constants.EMAIL_RECIPIENT,
+                    "Photo from Restaurant le Méditerranée",
+                    "Please find attached a photo taken at Restaurant le Méditerranée.",
+                    fileName,
+                    imageBytes
+            );
 
-                Alert alert = new Alert(Alert.AlertType.ERROR);
-                alert.setTitle("Email Error");
-                alert.setHeaderText("Failed to prepare image for email");
-                alert.setContentText("Error: " + e.getMessage());
-                alert.showAndWait();
-            }
-        } else {
+            // Show success alert
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Success");
+            alert.setHeaderText("Email Sent");
+            alert.setContentText("Your photo has been emailed successfully!");
+            alert.showAndWait();
+
+        } catch (Exception e) {
+            logger.error("Error emailing image: {}", e.getMessage(), e);
+
+            // Show error alert
             Alert alert = new Alert(Alert.AlertType.ERROR);
             alert.setTitle("Error");
-            alert.setHeaderText("No Image Available");
-            alert.setContentText("There is no image to email. Please take a photo first.");
+            alert.setHeaderText("Email Failed");
+            alert.setContentText("Failed to email the photo: " + e.getMessage());
             alert.showAndWait();
         }
     }
@@ -605,82 +631,104 @@ public class CameraController implements Shutdown {
     @FXML
     private void onSwitchCamera() {
         if (cameraActive) {
-            // Stop current camera
-            if (cameraTimer != null && !cameraTimer.isShutdown()) {
+            // Stop the current camera
+            if (cameraTimer != null) {
                 cameraTimer.shutdown();
                 try {
                     cameraTimer.awaitTermination(33, TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e) {
-                    System.err.println("Error shutting down camera timer: " + e.getMessage());
+                    Thread.currentThread().interrupt();
                 }
             }
 
-            if (capture != null) {
-                capture.release();
+            if (webcam != null && webcam.isOpen()) {
+                webcam.close();
             }
 
             cameraActive = false;
+
+            // Switch to the next camera
+            List<Webcam> webcams = Webcam.getWebcams();
+            if (webcams.size() > 1) {
+                cameraIndex = (cameraIndex + 1) % webcams.size();
+                logger.info("Switching to camera index: {}", cameraIndex);
+            } else {
+                logger.info("Only one camera available, staying with current camera");
+            }
+
+            // Restart the camera
+            startCamera();
         }
-
-        // Switch to next camera
-        cameraIndex = (cameraIndex + 1) % 2;
-        System.out.println("Switching to camera index: " + cameraIndex);
-
-        // Start new camera
-        startCamera();
     }
 
     @FXML
     private void onChristmas1BorderSelected() {
-        if (this.currentBorder != null && this.currentBorder.equals("christmas1")) return;
-        this.currentBorder = "christmas1";
+        currentBorder = "christmas1";
+        logger.info("Christmas border 1 selected");
     }
 
     @FXML
     private void onChristmas2BorderSelected() {
-        if (this.currentBorder != null && this.currentBorder.equals("christmas2")) return;
-        this.currentBorder = "christmas2";
+        currentBorder = "christmas2";
+        logger.info("Christmas border 2 selected");
     }
 
     @FXML
     private void onChristmas3BorderSelected() {
-        if (this.currentBorder != null && this.currentBorder.equals("christmas3")) return;
-        this.currentBorder = "christmas3";
+        currentBorder = "christmas3";
+        logger.info("Christmas border 3 selected");
     }
 
     @FXML
     private void onValentinesBorderSelected() {
-        if (this.currentBorder != null && this.currentBorder.equals("valentines")) return;
-        this.currentBorder = "valentines";
+        currentBorder = "valentines";
+        logger.info("Valentines border selected");
     }
 
     @FXML
     private void onClearBorderSelected() {
-        this.currentBorder = null;
+        currentBorder = null;
+        logger.info("Border cleared");
     }
 
     @FXML
     private void onGenerateQRCode() {
-        qrCodeExecutor = Executors.newSingleThreadScheduledExecutor();
-        Stage stage = (Stage) cameraView.getScene().getWindow();
-        QRCodeDialog qrCodeDialog = new QRCodeDialog(stage);
-        qrCodeDialog.showLoading();
-        qrCodeDialog.show();
-
-        // Get the image bytes
-        Image image = processedImageView.getImage();
-        BufferedImage bufferedImage = convertFromFxImage(image);
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-
-        try {
-            ImageIO.write(bufferedImage, "png", byteArrayOutputStream);
-        } catch (IOException ex) {
-            qrCodeDialog.showError("Failed to generate QR code: " + ex.getMessage());
+        if (processedImageView.getImage() == null) {
+            logger.error("No image to generate QR code for");
             return;
         }
 
-        byte[] imageBytes = byteArrayOutputStream.toByteArray();
+        // Show user agreement dialog
+        if (!showUserAgreementDialog()) {
+            logger.info("User declined the agreement");
+            return;
+        }
 
+        // Convert the JavaFX image to a BufferedImage
+        BufferedImage bufferedImage = convertFromFxImage(processedImageView.getImage());
+
+        // Convert BufferedImage to byte array
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try {
+            ImageIO.write(bufferedImage, "png", baos);
+        } catch (IOException e) {
+            logger.error("Error converting image: {}", e.getMessage(), e);
+            return;
+        }
+
+        byte[] imageBytes = baos.toByteArray();
+
+        // Create and show the QR code dialog
+        Stage stage = (Stage) processedImageView.getScene().getWindow();
+        QRCodeDialog qrCodeDialog = new QRCodeDialog(stage);
+        qrCodeDialog.show();
+
+        // Initialize QR code executor if needed
+        if (qrCodeExecutor == null || qrCodeExecutor.isShutdown()) {
+            qrCodeExecutor = Executors.newSingleThreadScheduledExecutor();
+        }
+
+        // Create a task to generate the QR code
         Task<Image> qrCodeTask = new Task<>() {
             @Override
             protected Image call() throws Exception {
@@ -702,43 +750,13 @@ public class CameraController implements Shutdown {
         this.navigationService.navigateToView(e, this, "fxml/landing-page.fxml", "Landing Page", true);
     }
 
-    // Methods for converting between OpenCV Mat and JavaFX Images
-    private WritableImage convertToFxImage(Mat mat) {
-        // Get matrix dimensions
-        int width = mat.cols();
-        int height = mat.rows();
-
-        // Create buffered image
-        BufferedImage bufferedImage = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
-
-        // Get the data array from the matrix
-        byte[] data = new byte[width * height * (int) mat.elemSize()];
-        mat.get(0, 0, data);
-
-        // Fill the buffered image
-        if (mat.channels() == 3) {
-            // For BGR/RGB images
-            int[] intData = new int[width * height];
-            for (int i = 0; i < height; i++) {
-                for (int j = 0; j < width; j++) {
-                    int index = i * width + j;
-                    int bufferIndex = index * 3;
-                    int r = data[bufferIndex + 0] & 0xFF; // R
-                    int g = data[bufferIndex + 1] & 0xFF; // G
-                    int b = data[bufferIndex + 2] & 0xFF; // B
-                    intData[index] = 0xFF000000 | (r << 16) | (g << 8) | b;
-                }
-            }
-            bufferedImage.setRGB(0, 0, width, height, intData, 0, width);
-        }
-
-        // Convert to JavaFX image
-        WritableImage writableImage = new WritableImage(width, height);
+    // Method to convert BufferedImage to JavaFX WritableImage
+    private WritableImage convertToFxImage(BufferedImage bufferedImage) {
+        WritableImage writableImage = new WritableImage(bufferedImage.getWidth(), bufferedImage.getHeight());
         PixelWriter pixelWriter = writableImage.getPixelWriter();
 
-        // Copy pixel data
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
+        for (int y = 0; y < bufferedImage.getHeight(); y++) {
+            for (int x = 0; x < bufferedImage.getWidth(); x++) {
                 pixelWriter.setArgb(x, y, bufferedImage.getRGB(x, y));
             }
         }
@@ -769,12 +787,12 @@ public class CameraController implements Shutdown {
             try {
                 cameraTimer.awaitTermination(33, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
-                System.err.println("Error shutting down camera timer: " + e.getMessage());
+                logger.error("Error shutting down camera timer: {}", e.getMessage());
             }
         }
 
-        if (capture != null && capture.isOpened()) {
-            capture.release();
+        if (webcam != null && webcam.isOpen()) {
+            webcam.close();
         }
 
         if (this.qrCodeExecutor != null && !this.qrCodeExecutor.isShutdown()) {
@@ -783,7 +801,7 @@ public class CameraController implements Shutdown {
             try {
                 qrCodeExecutor.awaitTermination(2, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
-                System.err.println("Error shutting down QR code executor: " + e.getMessage());
+                logger.error("Error shutting down QR code executor: {}", e.getMessage());
                 Thread.currentThread().interrupt();
             }
         }
@@ -798,7 +816,7 @@ public class CameraController implements Shutdown {
         borders.clear();
 
         EmailSender.shutdown();
-        System.out.println("Camera resources released");
-        System.out.println("Email resources released");
+        logger.info("Camera resources released");
+        logger.info("Email resources released");
     }
 }

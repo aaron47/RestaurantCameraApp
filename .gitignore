@@ -3,6 +3,9 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+### LOGS ###
+logback.xml
+
 ### VIDEO ###
 *.mp4
 service-account-key.json
