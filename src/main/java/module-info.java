@@ -5,7 +5,6 @@ module com.billcom.drools.camtest {
     requires java.desktop;
     requires java.mail;
     requires activation;
-    requires org.bytedeco.opencv;
     requires com.google.api.client;
     requires com.google.api.client.json.gson;
     requires google.api.client;

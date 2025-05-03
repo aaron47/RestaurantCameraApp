@@ -6,14 +6,8 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.input.KeyCombination;
 import javafx.stage.Stage;
-import org.bytedeco.javacpp.Loader;
-import org.bytedeco.opencv.opencv_java;
 
 public class RestaurantApplication extends Application {
-
-    static {
-        Loader.load(opencv_java.class);
-    }
 
     @Override
     public void start(Stage primaryStage) throws Exception {
