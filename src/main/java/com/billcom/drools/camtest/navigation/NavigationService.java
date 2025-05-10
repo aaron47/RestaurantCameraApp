@@ -14,77 +14,76 @@ import java.io.IOException;
 
 public class NavigationService {
 
-    private void navigate(ActionEvent e, Object controllerToShutdown, String fxmlViewPath, String title, ControllerShutdownCallback shutdownCallback) throws IOException {
-        Stage stage = (Stage) ((Node) e.getSource()).getScene().getWindow();
+    /**
+     * Navigation triggered by a UI event (e.g. button click)
+     */
+    public void navigateToView(ActionEvent event, Object currentController, String fxmlViewPath, String title, boolean shutdown) throws IOException {
+        Stage stage = extractStageFromEvent(event);
+        navigate(stage, currentController, fxmlViewPath, title, shutdown ? Shutdown::shutdown : null);
+    }
 
-        // --- Step 1: Shut down the PASSED controller (if applicable) ---
-        // Use the explicitly passed controllerToShutdown instead of stage.getUserData()
-        if (shutdownCallback != null && controllerToShutdown instanceof Shutdown oldController) {
-            System.out.println("Attempting to shutdown passed controller: " + oldController.getClass().getName());
+    /**
+     * Navigation triggered programmatically (e.g. from a timer or other logic)
+     */
+    public void navigateWithoutEvent(Node anyNodeInScene, Object currentController, String fxmlViewPath, String title, boolean shutdown) throws IOException {
+        Stage stage = (Stage) anyNodeInScene.getScene().getWindow();
+        navigate(stage, currentController, fxmlViewPath, title, shutdown ? Shutdown::shutdown : null);
+    }
+
+    /**
+     * Internal method that performs the actual navigation
+     */
+    private void navigate(Stage stage, Object oldController, String fxmlViewPath, String title, ControllerShutdownCallback shutdownCallback) throws IOException {
+        // Shutdown logic
+        if (shutdownCallback != null && oldController instanceof Shutdown shutdownController) {
             try {
-                // Execute the shutdown logic passed via the callback on the OLD controller
-                shutdownCallback.shutdown(oldController);
-                System.out.println("Passed controller shutdown successful.");
-                // We don't need to clear UserData here, as we didn't rely on it for shutdown
+                System.out.println("Shutting down controller: " + shutdownController.getClass().getName());
+                shutdownCallback.shutdown(shutdownController);
             } catch (Exception ex) {
-                System.err.println("Error during shutdown of " + oldController.getClass().getName() + ": " + ex.getMessage());
+                System.err.println("Error during shutdown: " + ex.getMessage());
                 ex.printStackTrace();
             }
-        } else if (shutdownCallback != null) {
-            System.out.println("Shutdown requested, but passed controller is not an instance of Shutdown or is null.");
-            System.out.println("Passed controller: " + controllerToShutdown);
         }
 
-        // --- Step 2: Load the NEW view and controller ---
+        // Load new scene
         FXMLLoader loader = new FXMLLoader(RestaurantApplication.class.getResource(fxmlViewPath));
         Parent root = loader.load();
-        Object newControllerInstance = loader.getController(); // Get the NEW controller
+        Object newController = loader.getController();
 
-        // --- Step 3: Prepare the stage for the NEW view ---
+        // Configure scene and stage
         Scene scene = new Scene(root);
         stage.setTitle(title);
-        stage.setScene(scene); // Set the NEW scene
+        stage.setScene(scene);
         stage.setFullScreen(true);
         stage.setFullScreenExitKeyCombination(KeyCombination.NO_MATCH);
         stage.setResizable(false);
 
-        // --- Step 4: Store the NEW controller instance in UserData ---
-        // This is still useful if you want to access the *current* controller
-        // from elsewhere, or potentially for the window's OnCloseRequest.
-        if (newControllerInstance instanceof Shutdown newShutdownController) {
-            System.out.println("Setting UserData for new controller: " + newShutdownController.getClass().getName());
-            stage.setUserData(newShutdownController); // Store the NEW controller
-
-            // Set OnCloseRequest for the *window* closing event, using the NEW controller
-            // This handles closing the entire application window.
-            stage.setOnCloseRequest(windowEvent -> {
-                System.out.println("Window close requested. Shutting down current controller: " + newShutdownController.getClass().getName());
+        // Store controller for later shutdown
+        if (newController instanceof Shutdown newShutdownController) {
+            stage.setUserData(newShutdownController);
+            stage.setOnCloseRequest(e -> {
                 try {
                     newShutdownController.shutdown();
                 } catch (Exception ex) {
-                    System.err.println("Error during window close shutdown: " + ex.getMessage());
+                    System.err.println("Error during window close: " + ex.getMessage());
                 }
             });
-
         } else {
-            // If the new controller doesn't implement Shutdown, clear UserData and remove the handler
             stage.setUserData(null);
-            stage.setOnCloseRequest(null); // Remove previous handler if any
-            System.out.println("New controller does not implement Shutdown. UserData cleared.");
+            stage.setOnCloseRequest(null);
         }
 
-        // --- Step 5: Show the stage ---
         stage.show();
     }
 
-    // Modified signature: Added 'Object currentController' parameter
-    public void navigateToView(ActionEvent e, Object currentController, String fxmlViewPath, String title, boolean shutdown) throws IOException {
-        if (shutdown) {
-            navigate(e, currentController, fxmlViewPath, title, Shutdown::shutdown);
-        } else {
-            navigate(e, currentController, fxmlViewPath, title, null);
+    /**
+     * Extracts the JavaFX Stage from an ActionEvent
+     */
+    private Stage extractStageFromEvent(ActionEvent e) {
+        Object source = e.getSource();
+        if (source instanceof Node node) {
+            return (Stage) node.getScene().getWindow();
         }
+        throw new IllegalArgumentException("Event source is not a JavaFX Node");
     }
-
-
 }

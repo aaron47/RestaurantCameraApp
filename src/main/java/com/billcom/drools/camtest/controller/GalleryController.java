@@ -1,23 +1,31 @@
 package com.billcom.drools.camtest.controller;
 
 
+import com.billcom.drools.camtest.inactivity.IdleMonitor;
 import com.billcom.drools.camtest.navigation.NavigationService;
 import com.billcom.drools.camtest.util.Constants;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.Scene;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.input.SwipeEvent;
 import javafx.scene.input.ZoomEvent;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
+import javafx.util.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +34,7 @@ import java.util.ResourceBundle;
 public class GalleryController implements Initializable, Shutdown {
     // Thumbnail dimensions for touch-friendly interaction
     private static final int THUMBNAIL_SIZE = 225;
+    private static final Logger logger = LoggerFactory.getLogger(GalleryController.class);
     private final NavigationService navigationService = new NavigationService();
 
     @FXML
@@ -49,6 +58,9 @@ public class GalleryController implements Initializable, Shutdown {
     // Index of the current image shown in full view
     private int currentIndex = -1;
 
+    // Inactivity Monitor
+    private IdleMonitor idleMonitor;
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         // Bind full image view to parent size
@@ -62,8 +74,30 @@ public class GalleryController implements Initializable, Shutdown {
 
         populateGallery();
         setupFullViewGestureHandlers();
+
+        javafx.application.Platform.runLater(this::setupIdleMonitor);
     }
 
+    private void setupIdleMonitor() {
+        this.idleMonitor = new IdleMonitor(
+                Duration.seconds(10),
+                this::navigateToLandingPage,
+                true
+        );
+
+        Scene currentScene = this.fullImageView.getScene();
+        this.idleMonitor.registerEvent(currentScene, MouseEvent.ANY);
+        this.idleMonitor.registerEvent(currentScene, KeyEvent.ANY);
+        logger.info("Idle monitor registered for scene events.");
+    }
+
+    private void navigateToLandingPage() {
+        try {
+            this.navigationService.navigateWithoutEvent(fullImageView, this, "fxml/landing-page.fxml", "Landing Page", true);
+        } catch (IOException e) {
+            logger.debug("Error navigating to landing page: {}", e.getMessage());
+        }
+    }
 
     // Populate the gallery with thumbnails
     private void populateGallery() {

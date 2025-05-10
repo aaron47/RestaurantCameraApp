@@ -1,15 +1,18 @@
 package com.billcom.drools.camtest.controller;
 
 import com.billcom.drools.camtest.RestaurantApplication;
+import com.billcom.drools.camtest.inactivity.IdleMonitor;
 import com.billcom.drools.camtest.navigation.NavigationService;
-import com.billcom.drools.camtest.util.Constants;
 import com.billcom.drools.camtest.util.EmailSender;
 import com.billcom.drools.camtest.dialog.QRCodeDialog;
 import com.billcom.drools.camtest.drive.GoogleDriveService;
 import com.billcom.drools.camtest.util.FileService;
-import java.awt.Dimension;
-import java.util.Arrays;
 
+import java.awt.Dimension;
+
+import javafx.scene.Scene;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
 import javafx.stage.StageStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,7 +111,11 @@ public class CameraController implements Shutdown {
     // Store the raw camera frame without borders
     private WritableImage rawCameraFrame = null;
 
+    // navigation service
     private final NavigationService navigationService = new NavigationService();
+
+    // inactivity monitor
+    private IdleMonitor idleMonitor;
 
     // Methods for initialising necessary functionality for the application
     @FXML
@@ -126,7 +133,29 @@ public class CameraController implements Shutdown {
             // Ensure cancel button is properly initialized
             cancelTimerBtn.setVisible(false);
             cancelTimerBtn.toFront();
+            this.setupIdleMonitor();
         });
+    }
+
+    private void setupIdleMonitor() {
+        this.idleMonitor = new IdleMonitor(
+                Duration.seconds(10),
+                this::navigateToLandingPage,
+                true
+        );
+
+        Scene currentScene = this.processedImageView.getScene();
+        this.idleMonitor.registerEvent(currentScene, MouseEvent.ANY);
+        this.idleMonitor.registerEvent(currentScene, KeyEvent.ANY);
+        logger.info("Idle Monitor Started");
+    }
+
+    private void navigateToLandingPage() {
+        try {
+            this.navigationService.navigateWithoutEvent(cameraView, this, "fxml/landing-page.fxml", "Landing Page", true);
+        } catch (IOException e) {
+            logger.debug("Error navigating to landing page: {}", e.getMessage());
+        }
     }
 
     private void loadBorders() {
@@ -817,6 +846,17 @@ public class CameraController implements Shutdown {
 
         if (countDownTimeline != null) {
             countDownTimeline.stop();
+        }
+
+        // Stop the idle monitor
+        if (idleMonitor != null) {
+            Scene currentScene = processedImageView.getScene();
+            if (currentScene != null) {
+                idleMonitor.removeEvent(currentScene, MouseEvent.ANY);
+                idleMonitor.removeEvent(currentScene, KeyEvent.ANY);
+            }
+            idleMonitor.stopMonitoring();
+            idleMonitor = null;
         }
 
         cameraView.setImage(null);
