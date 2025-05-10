@@ -9,6 +9,8 @@ import com.billcom.drools.camtest.drive.GoogleDriveService;
 import com.billcom.drools.camtest.util.FileService;
 import java.awt.Dimension;
 import java.util.Arrays;
+
+import javafx.stage.StageStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javafx.animation.KeyFrame;
@@ -501,7 +503,7 @@ public class CameraController implements Shutdown {
         }
     }
 
-    private boolean showUserAgreementDialog() {
+    private boolean showUserAgreementDialog(Stage ownerStage) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("User Agreement");
         alert.setHeaderText("Terms of Use");
@@ -509,6 +511,7 @@ public class CameraController implements Shutdown {
                 "1. The photo may be displayed in the restaurant and on social media.\n" +
                 "2. You have permission from all individuals in the photo to share it.\n\n" +
                 "Do you agree to these terms?");
+        alert.initOwner(ownerStage);
 
         // Set modality to APPLICATION_MODAL to block input to other windows
         alert.initModality(Modality.APPLICATION_MODAL);
@@ -530,8 +533,10 @@ public class CameraController implements Shutdown {
             return;
         }
 
+        Stage currentStage = (Stage) processedImageView.getScene().getWindow();
+
         // Show user agreement dialog
-        if (!showUserAgreementDialog()) {
+        if (!showUserAgreementDialog(currentStage)) {
             logger.info("User declined the agreement");
             return;
         }
@@ -556,6 +561,9 @@ public class CameraController implements Shutdown {
 
             // Show success alert
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.initModality(Modality.APPLICATION_MODAL);
+            alert.initStyle(StageStyle.UTILITY);
+            alert.initOwner(currentStage);
             alert.setTitle("Success");
             alert.setHeaderText("Photo Saved");
             alert.setContentText("Your photo has been saved successfully!");
@@ -566,6 +574,9 @@ public class CameraController implements Shutdown {
 
             // Show error alert
             Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.initModality(Modality.APPLICATION_MODAL);
+            alert.initStyle(StageStyle.UTILITY);
+            alert.initOwner(currentStage);
             alert.setTitle("Error");
             alert.setHeaderText("Save Failed");
             alert.setContentText("Failed to save the photo: " + e.getMessage());
@@ -579,9 +590,10 @@ public class CameraController implements Shutdown {
             logger.error("No image to email");
             return;
         }
+        Stage currentStage = (Stage) processedImageView.getScene().getWindow();
 
         // Show user agreement dialog
-        if (!showUserAgreementDialog()) {
+        if (!showUserAgreementDialog(currentStage)) {
             logger.info("User declined the agreement");
             return;
         }
@@ -600,30 +612,26 @@ public class CameraController implements Shutdown {
             String timestamp = dateFormat.format(new Date());
             String fileName = "photo_" + timestamp + ".png";
 
-            // Send the email with the image attachment
-            EmailSender.sendEmailWithAttachment(
-                    Constants.EMAIL_RECIPIENT,
+            // Show email dialog for user to input email address
+            EmailSender.showEmailDialogForByteArray(
+                    currentStage,
                     "Photo from Restaurant le Méditerranée",
                     "Please find attached a photo taken at Restaurant le Méditerranée.",
                     fileName,
                     imageBytes
             );
 
-            // Show success alert
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle("Success");
-            alert.setHeaderText("Email Sent");
-            alert.setContentText("Your photo has been emailed successfully!");
-            alert.showAndWait();
-
         } catch (Exception e) {
-            logger.error("Error emailing image: {}", e.getMessage(), e);
+            logger.error("Error preparing image for email: {}", e.getMessage(), e);
 
             // Show error alert
             Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.initModality(Modality.APPLICATION_MODAL);
+            alert.initStyle(StageStyle.UTILITY);
+            alert.initOwner(currentStage);
             alert.setTitle("Error");
-            alert.setHeaderText("Email Failed");
-            alert.setContentText("Failed to email the photo: " + e.getMessage());
+            alert.setHeaderText("Email Preparation Failed");
+            alert.setContentText("Failed to prepare the photo for email: " + e.getMessage());
             alert.showAndWait();
         }
     }
@@ -697,9 +705,11 @@ public class CameraController implements Shutdown {
             logger.error("No image to generate QR code for");
             return;
         }
+        Stage currentStage = (Stage) processedImageView.getScene().getWindow();
 
+        Stage stage = (Stage) processedImageView.getScene().getWindow();
         // Show user agreement dialog
-        if (!showUserAgreementDialog()) {
+        if (!showUserAgreementDialog(stage)) {
             logger.info("User declined the agreement");
             return;
         }
@@ -719,7 +729,6 @@ public class CameraController implements Shutdown {
         byte[] imageBytes = baos.toByteArray();
 
         // Create and show the QR code dialog
-        Stage stage = (Stage) processedImageView.getScene().getWindow();
         QRCodeDialog qrCodeDialog = new QRCodeDialog(stage);
         qrCodeDialog.show();
 

@@ -191,6 +191,126 @@ public class EmailSender {
         alert.showAndWait();
     }
 
+    // Show email dialog for byte array attachment
+    public static void showEmailDialogForByteArray(Stage parentStage, String subject, String body, String attachmentName, byte[] attachmentData) {
+        // Create the custom dialog
+        Dialog<String> dialog = new Dialog<>();
+        dialog.setTitle("Send Photo via Email");
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.initStyle(StageStyle.UTILITY);
+        dialog.initOwner(parentStage);
+
+        // Set the button types
+        ButtonType sendButtonType = new ButtonType("Send", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(sendButtonType, ButtonType.CANCEL);
+
+        // Create the email label and field
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 150, 10, 10));
+
+        TextField emailField = new TextField();
+        emailField.setPromptText("Enter recipient email address");
+
+        grid.add(new Label("Email address:"), 0, 0);
+        grid.add(emailField, 1, 0);
+        GridPane.setHgrow(emailField, Priority.ALWAYS);
+
+        // Enable/Disable send button based on email validity
+        Node sendButton = dialog.getDialogPane().lookupButton(sendButtonType);
+        sendButton.setDisable(true);
+
+        // Validate email as user types
+        emailField.textProperty().addListener((observable, oldValue, newValue) -> {
+            sendButton.setDisable(!isValidEmail(newValue));
+        });
+
+        emailField.focusedProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue) {
+                openVirtualKeyboad();
+            }
+        });
+
+        dialog.getDialogPane().setContent(grid);
+
+        // Request focus on the email field by default
+        Platform.runLater(emailField::requestFocus);
+
+        // Convert the result to an email address when the send button is clicked
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == sendButtonType) {
+                return emailField.getText();
+            }
+            return null;
+        });
+
+        // Process result
+        dialog.showAndWait().ifPresent(emailAddress -> {
+            // Show sending progress indicator
+            showProgressDialogForByteArray(parentStage, emailAddress, subject, body, attachmentName, attachmentData);
+        });
+    }
+
+    // Show progress while sending email with byte array attachment
+    private static void showProgressDialogForByteArray(Stage parentStage, String emailAddress, String subject, String body, String attachmentName, byte[] attachmentData) {
+        // Create dialog
+        Dialog<Void> progressDialog = new Dialog<>();
+        progressDialog.setTitle("Sending Email");
+        progressDialog.initModality(Modality.APPLICATION_MODAL);
+        progressDialog.initStyle(StageStyle.UTILITY);
+        progressDialog.initOwner(parentStage);
+        progressDialog.setHeaderText("Sending photo to " + emailAddress);
+
+        // Create progress indicator
+        ProgressIndicator progressIndicator = new ProgressIndicator();
+        VBox content = new VBox(10, progressIndicator);
+        content.setAlignment(Pos.CENTER);
+        content.setPadding(new Insets(20));
+        progressDialog.getDialogPane().setContent(content);
+
+        // No buttons needed during progress
+        progressDialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+        Node cancelButton = progressDialog.getDialogPane().lookupButton(ButtonType.CANCEL);
+        cancelButton.setVisible(false);
+
+        // Start sending email in background
+        CompletableFuture<Boolean> sendTask = CompletableFuture.supplyAsync(() -> {
+            try {
+                // Create a temporary file for the attachment
+                File tempFile = File.createTempFile("email_attachment_", attachmentName);
+                tempFile.deleteOnExit();
+
+                // Write the attachment data to the file
+                java.nio.file.Files.write(tempFile.toPath(), attachmentData);
+
+                // Send the email
+                boolean success = sendEmail(emailAddress, tempFile);
+
+                // Delete the temporary file
+                tempFile.delete();
+
+                return success;
+            } catch (Exception e) {
+                System.err.println("Error sending email: " + e.getMessage());
+                e.printStackTrace();
+                return false;
+            }
+        }, emailExecutor);
+
+        // When email is sent, close progress dialog and show result
+        sendTask.thenAccept(success -> {
+            Platform.runLater(() -> {
+                progressDialog.close();
+                closeVirtualKeyboard();
+                showResultDialog(parentStage, success, emailAddress);
+            });
+        });
+
+        // Show progress dialog
+        progressDialog.show();
+    }
+
     // Send email with attachment using byte array
     public static void sendEmailWithAttachment(String recipient, String subject, String body, String attachmentName, byte[] attachmentData) {
         // Start sending email in background
